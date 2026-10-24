@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Painel de clientes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;700&display=swap">
+<style>
+:root{--bg:#EEF2F4;--panel:#fff;--ink:#13202B;--mut:#5B6B77;--line:#D5DDE2;--a1:#0F766E;--a2:#B86E00;--bt:#13202B;--btt:#fff;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0E161C;--panel:#16222B;--ink:#E6EEF2;--mut:#93A4AF;--line:#26353F;--a1:#2DD4BF;--a2:#F5B14C;--bt:#E6EEF2;--btt:#0E161C;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0E161C;--panel:#16222B;--ink:#E6EEF2;--mut:#93A4AF;--line:#26353F;--a1:#2DD4BF;--a2:#F5B14C;--bt:#E6EEF2;--btt:#0E161C;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 15px/1.5 "Schibsted Grotesk",system-ui,sans-serif}
+main{max-width:1120px;margin:0 auto;padding:28px 18px 48px}
+header{display:flex;flex-wrap:wrap;gap:16px;justify-content:space-between;align-items:flex-end}
+h1{margin:0;font-size:30px;line-height:1.1;font-weight:700;letter-spacing:-.02em}
+h2{font-size:18px;margin:36px 0 12px}
+#sub{margin:6px 0 0;color:var(--mut)}
+.act{display:flex;flex-wrap:wrap;gap:8px}
+.btn,button{font:500 14px "Schibsted Grotesk",system-ui,sans-serif;padding:9px 14px;border-radius:6px;border:1px solid var(--bt);background:var(--bt);color:var(--btt);cursor:pointer}
+button{background:transparent;color:var(--ink);border-color:var(--line)}
+button:hover:not(:disabled){border-color:var(--ink)}
+button:disabled{opacity:.45;cursor:not-allowed}
+.btn:focus-visible,button:focus-visible,#f:focus-visible+label{outline:2px solid var(--a1);outline-offset:2px}
+#msg{min-height:22px;margin:14px 0 0;color:var(--a1);font-weight:500}
+#msg.err{color:#C0392B}
+.kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-top:10px;background:var(--panel);border:1px solid var(--line);border-radius:8px}
+.kpi div{padding:14px 16px;border-left:1px solid var(--line);border-top:1px solid var(--line);margin:-1px 0 0 -1px}
+.kpi b{display:block;font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
+.kpi span{color:var(--mut);font-size:13px}
+.kpi small{display:block;color:var(--mut);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:18px}
+figure{margin:0;padding:14px 16px;background:var(--panel);border:1px solid var(--line);border-radius:8px;min-width:0}
+figure.w2{grid-column:1/-1}
+figcaption{font-weight:500;margin-bottom:8px}
+.cv{position:relative;height:240px}.w2 .cv{height:300px}
+.tw{overflow-x:auto;background:var(--panel);border:1px solid var(--line);border-radius:8px}
+table{border-collapse:collapse;width:100%;min-width:560px}
+th,td{text-align:left;padding:9px 14px;border-bottom:1px solid var(--line)}
+th{font-weight:500;color:var(--mut);font-size:13px}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+tr:last-child td{border-bottom:0}
+@media (max-width:720px){.grid{grid-template-columns:1fr}h1{font-size:25px}}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <div><h1>Painel de clientes</h1><p id="sub"></p></div>
+  <div class="act">
+    <input id="f" type="file" accept=".xlsx,.xls,.csv" hidden>
+    <label class="btn" for="f" tabindex="0">Importar Excel</label>
+    <button data-x="csv" disabled>Salvar em CSV</button>
+    <button data-x="pdf" disabled>Salvar em PDF</button>
+    <button data-x="doc" disabled>Salvar em Word</button>
+  </div>
+</header>
+<p id="msg" role="status"></p>
+<section id="kpi" class="kpi"></section>
+<section class="grid">
+  <figure class="w2"><figcaption>Maiores valores por cliente</figcaption><div class="cv"><canvas id="c1"></canvas></div></figure>
+  <figure><figcaption>Valor acumulado por data</figcaption><div class="cv"><canvas id="c2"></canvas></div></figure>
+  <figure><figcaption>Clientes por faixa de preço</figcaption><div class="cv"><canvas id="c3"></canvas></div></figure>
+</section>
+<h2>Registros</h2>
+<div class="tw"><table><thead><tr><th>ID</th><th>Nome</th><th>Produto</th><th class="n">Valor</th><th>Data</th></tr></thead><tbody id="tb"></tbody></table></div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script>
+const $=s=>document.querySelector(s),esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const brl=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}),fd=d=>d.toLocaleDateString('pt-BR');
+const D=(y,m,d)=>new Date(y,m-1,d),cs=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const msg=(t,e)=>{const m=$('#msg');m.textContent=t;m.className=e?'err':''};
+let rows=[[1,'Ana Souza','Notebook Dell Inspiron',4299.9,9,3],[2,'Carlos Lima','Mouse sem fio Logitech',129.9,9,5],[3,'Mariana Costa','Monitor LG 24"',899,9,8],[4,'João Pereira','Teclado mecânico',349.5,9,10],[5,'Fernanda Alves','Headset Gamer',289.9,9,12],[6,'Ricardo Santos','Webcam Full HD',219,9,15],[7,'Patrícia Rocha','Impressora HP Multifuncional',1050,9,17],[8,'Lucas Ferreira','SSD 1TB Kingston',479.9,9,19],[9,'Camila Duarte','Smartphone Samsung Galaxy',2399,9,22],[10,'Rafael Martins','Tablet Lenovo',1599,9,24],[11,'Juliana Barros','Cadeira de escritório',1190,9,26],[12,'Bruno Carvalho','Roteador Wi-Fi 6',389.9,9,29],[13,'Aline Ribeiro','Smartwatch Xiaomi',459,10,2],[14,'Thiago Gomes','Caixa de som Bluetooth JBL',599.9,10,6],[15,'Beatriz Nunes','Hub USB-C 7 em 1',199.9,10,9]].map(r=>({id:r[0],nome:r[1],produto:r[2],valor:r[3],data:D(2026,r[4],r[5])}));
+let src='Dados de exemplo',S=[],ch=[],dl=null;
+
+function stats(){
+  const v=rows.map(r=>r.valor).sort((a,b)=>a-b),n=v.length,t=v.reduce((a,b)=>a+b,0);
+  const med=n%2?v[(n-1)/2]:(v[n/2-1]+v[n/2])/2;
+  const mx=rows.reduce((a,b)=>b.valor>a.valor?b:a),mn=rows.reduce((a,b)=>b.valor<a.valor?b:a);
+  const ds=rows.map(r=>r.data).sort((a,b)=>a-b),dias=Math.round((ds[n-1]-ds[0])/864e5);
+  const m={};rows.forEach(r=>{const k=r.data.getFullYear()*100+r.data.getMonth()+1;m[k]=(m[k]||0)+r.valor});
+  const bk=Object.keys(m).reduce((a,b)=>m[b]>m[a]?b:a);
+  const bl=new Date(Math.floor(bk/100),bk%100-1,1).toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
+  S=[['Registros',n],['Valor total',brl.format(t)],['Valor médio',brl.format(t/n)],['Mediana',brl.format(med)],
+     ['Maior valor',brl.format(mx.valor),mx.nome],['Menor valor',brl.format(mn.valor),mn.nome],
+     ['Período',fd(ds[0])+' a '+fd(ds[n-1]),dias+' dias'],['Mês de maior valor',bl,brl.format(m[bk])]];
+}
+function charts(){
+  ch.forEach(c=>c.destroy());ch=[];
+  const a1=cs('--a1'),a2=cs('--a2'),ln=cs('--line');
+  Chart.defaults.color=cs('--mut');Chart.defaults.font.family='"Schibsted Grotesk",system-ui,sans-serif';
+  const o={responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}}};
+  const yx={grid:{color:ln},border:{display:false},ticks:{callback:v=>'R$ '+v.toLocaleString('pt-BR')}},xx={grid:{display:false}};
+  const top=[...rows].sort((a,b)=>b.valor-a.valor).slice(0,15);
+  ch.push(new Chart($('#c1'),{type:'bar',data:{labels:top.map(r=>r.nome),datasets:[{data:top.map(r=>r.valor),backgroundColor:a1,borderRadius:3}]},
+    options:{...o,scales:{x:xx,y:yx},plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>brl.format(c.parsed.y)}}}}}));
+  const sd=[...rows].sort((a,b)=>a.data-b.data);let acc=0;
+  ch.push(new Chart($('#c2'),{type:'line',data:{labels:sd.map(r=>fd(r.data).slice(0,5)),datasets:[{data:sd.map(r=>acc+=r.valor),borderColor:a2,backgroundColor:a2+'33',fill:true,tension:.25,pointRadius:2}]},
+    options:{...o,scales:{x:xx,y:yx},plugins:{legend:{display:false},tooltip:{callbacks:{title:i=>fd(sd[i[0].dataIndex].data),label:c=>brl.format(c.parsed.y)}}}}}));
+  const v=rows.map(r=>r.valor),lo=Math.min(...v),hi=Math.max(...v),k=5,w=(hi-lo)/k||1,b=Array(k).fill(0),f=x=>Math.round(x).toLocaleString('pt-BR');
+  v.forEach(x=>b[Math.min(k-1,Math.floor((x-lo)/w))]++);
+  ch.push(new Chart($('#c3'),{type:'bar',data:{labels:b.map((_,i)=>'R$ '+f(lo+i*w)+'–'+f(lo+(i+1)*w)),datasets:[{data:b,backgroundColor:a1,borderRadius:3}]},
+    options:{...o,scales:{x:{...xx,ticks:{maxRotation:0,autoSkip:false,font:{size:10}}},y:{grid:{color:ln},border:{display:false},ticks:{precision:0}}}}}));
+}
+function render(){
+  stats();
+  $('#sub').textContent=src+': '+rows.length+' registros';
+  $('#kpi').innerHTML=S.map(([a,b,c])=>`<div><span>${a}</span><b>${esc(b)}</b>${c?`<small>${esc(c)}</small>`:''}</div>`).join('');
+  $('#tb').innerHTML=rows.map(r=>`<tr><td>${esc(r.id)}</td><td>${esc(r.nome)}</td><td>${esc(r.produto)}</td><td class="n">${brl.format(r.valor)}</td><td>${fd(r.data)}</td></tr>`).join('');
+  charts();
+}
+
+/* Importação */
+const nk=s=>String(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+function toDate(v){
+  if(v instanceof Date&&!isNaN(v)){const x=new Date(v.getTime()+432e5);return D(x.getFullYear(),x.getMonth()+1,x.getDate())}
+  const s=String(v);let m=s.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);if(m)return D(+m[3],+m[2],+m[1]);
+  m=s.match(/(\d{4})-(\d{2})-(\d{2})/);return m?D(+m[1],+m[2],+m[3]):null;
+}
+function toNum(v){
+  if(typeof v==='number')return v;let s=String(v).replace(/[^\d,.\-]/g,'');
+  if(s.includes(','))s=s.replace(/\./g,'').replace(',','.');
+  const n=parseFloat(s);return isNaN(n)?null:n;
+}
+function mapRow(o){
+  const g=(...ks)=>{for(const k in o)if(ks.includes(nk(k)))return o[k];return ''};
+  const r={id:g('id','codigo'),nome:g('nome','cliente'),produto:g('produto'),valor:toNum(g('valor','preco')),data:toDate(g('data'))};
+  return r.valor!==null&&r.data&&r.nome!==''?r:null;
+}
+$('#f').onchange=async e=>{
+  const f=e.target.files[0];if(!f)return;
+  try{
+    const csv=/\.csv$/i.test(f.name);
+    const wb=csv?XLSX.read(await f.text(),{type:'string',raw:true}):XLSX.read(await f.arrayBuffer(),{type:'array',cellDates:true});
+    const js=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:'',raw:csv});
+    const r=js.map(mapRow).filter(Boolean);
+    if(!r.length)throw 0;
+    rows=r;src=f.name;render();msg(r.length+' registros importados.');
+  }catch(_){msg('Não encontrei as colunas ID, Nome, Produto, Valor e Data nessa planilha. Confira os títulos da primeira linha.',1)}
+  e.target.value='';
+};
+$('label[for=f]').onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();$('#f').click()}};
+
+/* Exportação */
+const q=s=>/[;"\n]/.test(s)?'"'+String(s).replace(/"/g,'""')+'"':s;
+const mkCsv=()=>'\ufeff'+['ID;Nome;Produto;Valor;Data',...rows.map(r=>[q(r.id),q(r.nome),q(r.produto),r.valor.toFixed(2).replace('.',','),fd(r.data)].join(';'))].join('\r\n');
+function mkPdf(){
+  const d=new jspdf.jsPDF({unit:'mm',format:'a4'});let y=18;
+  d.setFontSize(18);d.text('Painel de clientes',14,y);y+=6;
+  d.setFontSize(9);d.setTextColor(100);d.text(src+' - gerado em '+fd(new Date()),14,y);y+=8;
+  d.setTextColor(20);d.setFontSize(10);
+  S.forEach(([k,v,n])=>{d.text(k+': '+v+(n?' ('+n+')':''),14,y);y+=5.5});y+=3;
+  const bg=cs('--panel');
+  [['c1',182],['c2',150],['c3',150]].forEach(([id,w])=>{
+    const c=$('#'+id),h=w*c.height/c.width;if(y+h>285){d.addPage();y=16}
+    const o=document.createElement('canvas');o.width=c.width;o.height=c.height;
+    const x=o.getContext('2d');x.fillStyle=bg;x.fillRect(0,0,o.width,o.height);x.drawImage(c,0,0);
+    d.addImage(o.toDataURL('image/png'),'PNG',14,y,w,h);y+=h+5;
+  });
+  d.addPage();y=16;const X=[14,28,72,138,168];
+  const row=(a,b)=>{if(y>282){d.addPage();y=16}d.setFont('helvetica',b?'bold':'normal');d.setFontSize(9);
+    a.forEach((t,i)=>d.text(String(t).slice(0,i==2?36:i==1?24:12),X[i],y));y+=6};
+  row(['ID','Nome','Produto','Valor','Data'],1);
+  rows.forEach(r=>row([r.id,r.nome,r.produto,brl.format(r.valor).replace(/\u00a0/g,' '),fd(r.data)]));
+  return d.output('blob');
+}
+async function mkDoc(){
+  const x=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  const p=(t,b,sz)=>`<w:p><w:r><w:rPr>${b?'<w:b/>':''}<w:sz w:val="${sz||22}"/></w:rPr><w:t xml:space="preserve">${x(t)}</w:t></w:r></w:p>`;
+  const bd=['top','left','bottom','right','insideH','insideV'].map(s=>`<w:${s} w:val="single" w:sz="4" w:color="BFBFBF"/>`).join('');
+  const tr=(a,b)=>`<w:tr>${a.map(t=>`<w:tc><w:tcPr><w:tcW w:w="0" w:type="auto"/></w:tcPr>${p(t,b,20)}</w:tc>`).join('')}</w:tr>`;
+  const body=p('Painel de clientes',1,36)+p(src+' - gerado em '+fd(new Date()),0,18)+p('Estatísticas',1,26)+
+    S.map(([k,v,n])=>p(k+': '+v+(n?' ('+n+')':''))).join('')+p('Registros',1,26)+
+    `<w:tbl><w:tblPr><w:tblW w:w="5000" w:type="pct"/><w:tblBorders>${bd}</w:tblBorders></w:tblPr>${tr(['ID','Nome','Produto','Valor','Data'],1)}${rows.map(r=>tr([r.id,r.nome,r.produto,brl.format(r.valor),fd(r.data)])).join('')}</w:tbl>${p('')}`;
+  const z=new JSZip();
+  z.file('[Content_Types].xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>');
+  z.file('_rels/.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>');
+  z.file('word/document.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>'+body+'</w:body></w:document>');
+  return z.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
+}
+async function save(name,make,label){
+  try{
+    const data=await make();
+    if(dl)await dl.save({filename:name,data});
+    else{const a=document.createElement('a');a.href=URL.createObjectURL(data instanceof Blob?data:new Blob([data],{type:'text/csv;charset=utf-8'}));a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4e3)}
+    msg(label+' salvo.')}
+  catch(e){if(e&&e.code!=='declined')msg('Não foi possível salvar o '+label+': '+((e&&e.message)||'erro inesperado'),1)}
+}
+document.querySelectorAll('[data-x]').forEach(b=>b.onclick=()=>{
+  const k=b.dataset.x;
+  if(k==='csv')save('clientes.csv',mkCsv,'CSV');
+  if(k==='pdf')save('painel_clientes.pdf',mkPdf,'PDF');
+  if(k==='doc')save('painel_clientes.docx',mkDoc,'Word');
+});
+(window.claude&&claude.use?claude.use('downloads'):Promise.resolve(null)).then(x=>{
+  dl=x;document.querySelectorAll('[data-x]').forEach(b=>b.disabled=false);
+}).catch(()=>{document.querySelectorAll('[data-x]').forEach(b=>b.disabled=false)});
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',charts);
+if(!(window.claude&&claude.use))document.querySelectorAll('[data-x]').forEach(b=>b.disabled=false);
+render();
+msg('Dados de exemplo carregados. Importe sua planilha com as colunas ID, Nome, Produto, Valor e Data.');
+</script>
+</body>
+</html>
